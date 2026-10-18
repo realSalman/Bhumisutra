@@ -829,7 +829,7 @@ export function verifyDeedFull(deedNo: string): import("@/types").VerificationRe
       "নিবন্ধন তারিখ": deed.registration_date,
       "অফিস": deed.registration_office ?? "—",
       "ঘোষিত মূল্য": deed.declared_value ? `৳${deed.declared_value.toLocaleString()}` : "—",
-      "হ্যাশ": deed.document_hash?.slice(0, 16) + "..." ?? "—",
+      "হ্যাশ": deed.document_hash ? `${deed.document_hash.slice(0, 16)}...` : "—",
     },
     ...(!hashMatch
       ? {
