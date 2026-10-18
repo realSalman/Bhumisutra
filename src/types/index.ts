@@ -352,3 +352,31 @@ export interface VerifyDeedResponse {
   parcel?: LandParcel;
   current_owner?: string;
 }
+
+// --- Source-level verification report ---
+
+export interface SourceCheckResult {
+  source_name: string;
+  source_icon: string;
+  found: boolean;
+  pass: boolean;
+  details: Record<string, string>;
+  mismatch_field?: string; // key in details that mismatched
+  mismatch_reason?: string;
+}
+
+export interface VerificationReport {
+  found: boolean;
+  deed?: Deed;
+  parcel?: LandParcel;
+  khatian?: Khatian;
+  mutation?: Mutation;
+  ownership?: OwnershipRecord;
+  encumbrances: Encumbrance[];
+  buyer?: Citizen;
+  seller?: Citizen;
+  hash_match: boolean;
+  sources: SourceCheckResult[];
+  final_score: number;
+  final_status: OwnershipVerificationStatus;
+}
