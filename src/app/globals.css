@@ -1,5 +1,5 @@
 /* ============================================================
-   Bhumisutra â€” Design System
+   Bhumisutra — Design System
    Minimal. Engineered. Government-grade.
    ============================================================ */
 
@@ -14,7 +14,7 @@
 
 /* --- Tokens --- */
 :root {
-  /* Color â€” muted, professional palette */
+  /* Color — muted, professional palette */
   --c-bg: #ffffff;
   --c-bg-subtle: #f6f7f9;
   --c-bg-muted: #edeef1;
