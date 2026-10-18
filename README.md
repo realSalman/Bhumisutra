@@ -222,6 +222,46 @@ The prototype is seeded with mock data. There are no real government APIs: `data
 
 ---
 
+## Frontend features (current build)
+
+### Visual architecture pipeline (`/`)
+
+The home page shows a **live architecture diagram** built with pure CSS — no images. Four connected layers:
+
+| Layer | Shows |
+|---|---|
+| ① সরকারি উৎস | 7 government source nodes with icons and what data each provides |
+| ② একীভূত ডাটাবেস | All 8 table names + the golden `ownership_records` table highlighted |
+| ③ ভেরিফিকেশন ইঞ্জিন | 3 cross-reference checks + pass/conflict rule |
+| ④ Output | Marketplace, Citizen Dashboard, Deed Verification |
+
+Arrows with labels connect each layer vertically so a viewer understands the entire system in seconds.
+
+### Source-level verification report (`/verify`)
+
+When a user enters a deed number, the result is **not** a flat list of fields. Instead, it shows **one card per government source**, each with:
+
+- **Source name and icon** (📜 সাব-রেজিস্ট্রি, 🏛 এসি ল্যান্ড, 🗺 DLRS, 🏦 ব্যাংক, ⚖ আদালত, 🏢 ডিসি অফিস)
+- **Pass/fail badge** — green ✓ or red ✕
+- **Detail rows** — every data field from that source
+- **Mismatch highlights** — mismatched fields are highlighted in red with an explanation
+
+The verdict bar at the top shows: status badge, score (e.g. ১০০/১০০), and how many sources passed (e.g. ৭/৭).
+
+### Marketplace source attribution (`/listing/[id]`)
+
+Each marketplace listing's detail page uses the **same source-card pattern**. Instead of generic sections (জমির তথ্য, খতিয়ান তথ্য...), each section is attributed to its government source with pass/fail. The sidebar shows a compact verification checklist.
+
+### Demo scenarios
+
+| Deed | Scenario | What happens |
+|---|---|---|
+| `789` | ✓ Happy path | All 7 sources pass, score 100, FULLY_VERIFIED |
+| `1456` | ✕ Fraud detection | Khatian shows different owner (Jamal vs Karim), no mutation, active court case, suspicious hash — score 34, CONFLICT |
+| `2100` | ✓ Gift deed (Heba) | Valid gift transfer, all sources pass |
+
+---
+
 ## Tech stack
 
 | Layer | Technology |
