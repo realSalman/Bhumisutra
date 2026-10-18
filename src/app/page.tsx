@@ -7,6 +7,10 @@ import {
 } from "@/lib/utils";
 import type { MarketplaceListing, OwnershipVerificationStatus } from "@/types";
 
+/* ------------------------------------------------------------------ */
+/*  Small reusable pieces                                             */
+/* ------------------------------------------------------------------ */
+
 function VerificationBadge({ status, score }: { status: OwnershipVerificationStatus; score: number }) {
   const config: Record<OwnershipVerificationStatus, { label: string; cls: string; icon: string }> = {
     FULLY_VERIFIED: { label: "যাচাইকৃত", cls: "badge--verified", icon: "✓" },
@@ -61,34 +65,172 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Architecture diagram data                                         */
+/* ------------------------------------------------------------------ */
+
+const GOV_SOURCES = [
+  { icon: "🏛", label: "এসি ল্যান্ড অফিস", sub: "খতিয়ান, নামজারি", en: "AC Land" },
+  { icon: "📜", label: "সাব-রেজিস্ট্রি", sub: "দলিল নিবন্ধন", en: "Sub-Registry" },
+  { icon: "🗺", label: "জরিপ অধিদপ্তর", sub: "মৌজা, দাগ ম্যাপ", en: "DLRS" },
+  { icon: "🏦", label: "ব্যাংক", sub: "বন্ধক, দায়", en: "Banks" },
+  { icon: "⚖", label: "জেলা আদালত", sub: "মামলা, নিষেধাজ্ঞা", en: "Courts" },
+  { icon: "🏢", label: "ডিসি অফিস", sub: "অধিগ্রহণ, খাস জমি", en: "DC Office" },
+  { icon: "🪪", label: "NID কর্তৃপক্ষ", sub: "নাগরিক পরিচয়", en: "NID Authority" },
+];
+
+const DB_TABLES = [
+  "mouzas", "land_parcels", "khatians",
+  "deeds", "mutations", "encumbrances",
+  "citizens", "ownership_records",
+];
+
+const CHECKS = [
+  { icon: "✓", label: "খতিয়ান মিল", en: "Khatian match" },
+  { icon: "✓", label: "দলিল মিল", en: "Deed match" },
+  { icon: "✓", label: "নামজারি মিল", en: "Mutation match" },
+];
+
+/* ------------------------------------------------------------------ */
+/*  Page                                                              */
+/* ------------------------------------------------------------------ */
+
 export default function HomePage() {
   const stats = getStats();
   const listings = getListings();
 
   return (
     <>
-      {/* Hero */}
+      {/* ── Hero ── */}
       <section className="hero">
         <div className="container">
-          <h1 className="hero__title">
-            জমির মালিকানা যাচাই করুন
-          </h1>
-          <p className="hero__subtitle">
-            সরকারি ৭টি উৎস থেকে সংগৃহীত তথ্যের ভিত্তিতে জমির মালিকানা যাচাই, দলিল সত্যায়ন এবং নিরাপদ ক্রয়-বিক্রয়।
+          <p className="hero__title">
+            সরকারি ৭টি উৎস থেকে সংগৃহীত তথ্যের ভিত্তিতে জমির মালিকানা যাচাই এবং নিরাপদ ক্রয়-বিক্রয়।
           </p>
           <div className="hero__actions">
             <Link href="/marketplace" className="btn btn--primary btn--lg">
               মার্কেটপ্লেস দেখুন
             </Link>
             <Link href="/verify" className="btn btn--secondary btn--lg">
-              দলিল যাচাই করুন
+              মালিকানা যাচাই করুন
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="section--muted">
+      {/* ── Architecture pipeline — the visual "how it works" ── */}
+      <section className="section section--muted">
+        <div className="container">
+          <div className="section__header text-center">
+            <h2 className="section__title">কিভাবে কাজ করে</h2>
+            <p className="section__subtitle">
+              সরকারি ৭টি বিভাগের তথ্য → এক ডাটাবেসে একত্রিত → ক্রস-ভেরিফিকেশন → যাচাইকৃত মার্কেটপ্লেস
+            </p>
+          </div>
+
+          <div className="arch">
+            {/* ── Layer 1: Government Sources ── */}
+            <div className="arch__layer">
+              <div className="arch__layer-label">
+                <span className="arch__layer-num">১</span>
+                সরকারি উৎস
+              </div>
+              <div className="arch__sources">
+                {GOV_SOURCES.map((s) => (
+                  <div key={s.en} className="arch__source-node">
+                    <span className="arch__source-icon">{s.icon}</span>
+                    <span className="arch__source-name">{s.label}</span>
+                    <span className="arch__source-sub">{s.sub}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Arrow ── */}
+            <div className="arch__arrow">
+              <div className="arch__arrow-line" />
+              <div className="arch__arrow-label">তথ্য সংগ্রহ</div>
+              <div className="arch__arrow-head">▼</div>
+            </div>
+
+            {/* ── Layer 2: Unified Database ── */}
+            <div className="arch__layer arch__layer--db">
+              <div className="arch__layer-label">
+                <span className="arch__layer-num">২</span>
+                একীভূত ডাটাবেস
+              </div>
+              <div className="arch__db-tables">
+                {DB_TABLES.map((t) => (
+                  <code key={t} className="arch__table-tag">{t}</code>
+                ))}
+              </div>
+              <div className="arch__db-golden">
+                <span className="arch__golden-icon">★</span>
+                <span>ownership_records — গোল্ডেন টেবিল</span>
+              </div>
+            </div>
+
+            {/* ── Arrow ── */}
+            <div className="arch__arrow">
+              <div className="arch__arrow-line" />
+              <div className="arch__arrow-label">ক্রস-রেফারেন্স</div>
+              <div className="arch__arrow-head">▼</div>
+            </div>
+
+            {/* ── Layer 3: Verification Engine ── */}
+            <div className="arch__layer arch__layer--verify">
+              <div className="arch__layer-label">
+                <span className="arch__layer-num">৩</span>
+                ভেরিফিকেশন ইঞ্জিন
+              </div>
+              <div className="arch__checks">
+                {CHECKS.map((c) => (
+                  <div key={c.en} className="arch__check-item">
+                    <span className="arch__check-icon">{c.icon}</span>
+                    <span>{c.label}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="arch__verify-rule">
+                ৩/৩ মিলে গেলে = <strong className="arch__pass">সম্পূর্ণ যাচাইকৃত ✓</strong>
+                {" · "}
+                কোনো অমিল = <strong className="arch__fail">বিরোধপূর্ণ ✕</strong>
+              </div>
+            </div>
+
+            {/* ── Arrow ── */}
+            <div className="arch__arrow">
+              <div className="arch__arrow-line" />
+              <div className="arch__arrow-label">অনুমোদিত</div>
+              <div className="arch__arrow-head">▼</div>
+            </div>
+
+            {/* ── Layer 4: Output ── */}
+            <div className="arch__layer arch__layer--output">
+              <div className="arch__outputs">
+                <div className="arch__output-node arch__output-node--market">
+                  <span className="arch__output-icon">🛒</span>
+                  <span className="arch__output-name">যাচাইকৃত মার্কেটপ্লেস</span>
+                  <span className="arch__output-sub">শুধু verified জমি তালিকাভুক্ত</span>
+                </div>
+                <div className="arch__output-node arch__output-node--dash">
+                  <span className="arch__output-icon">👤</span>
+                  <span className="arch__output-name">নাগরিক ড্যাশবোর্ড</span>
+                  <span className="arch__output-sub">NID-ভিত্তিক মালিকানা প্রোফাইল</span>
+                </div>
+                <div className="arch__output-node arch__output-node--verify">
+                  <span className="arch__output-icon">🔍</span>
+                  <span className="arch__output-name">দলিল যাচাই</span>
+                  <span className="arch__output-sub">হ্যাশ ম্যাচ, মালিকানা চেক</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Stats ── */}
+      <section className="section">
         <div className="container">
           <div className="stat-bar">
             <div className="stat-block">
@@ -111,59 +253,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="section">
-        <div className="container">
-          <div className="section__header text-center">
-            <h2 className="section__title">কিভাবে কাজ করে</h2>
-          </div>
-          <div className="steps">
-            <div className="step">
-              <div className="step__number">১</div>
-              <h3 className="step__title">তথ্য সংগ্রহ</h3>
-              <p className="step__desc">
-                সাব-রেজিস্ট্রি, এসি ল্যান্ড, জরিপ বিভাগ, ব্যাংক ও আদালত থেকে তথ্য সংগ্রহ করা হয়।
-              </p>
-            </div>
-            <div className="step">
-              <div className="step__number">২</div>
-              <h3 className="step__title">ক্রস-ভেরিফিকেশন</h3>
-              <p className="step__desc">
-                খতিয়ান, দলিল ও নামজারি রেকর্ড পরস্পর যাচাই করে মালিকানা স্কোর নির্ধারণ করা হয়।
-              </p>
-            </div>
-            <div className="step">
-              <div className="step__number">৩</div>
-              <h3 className="step__title">যাচাইকৃত মার্কেটপ্লেস</h3>
-              <p className="step__desc">
-                শুধুমাত্র সম্পূর্ণ যাচাইকৃত ও দায়মুক্ত জমিই মার্কেটপ্লেসে তালিকাভুক্ত হতে পারে।
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Data sources */}
+      {/* ── Featured listings ── */}
       <section className="section section--muted">
-        <div className="container">
-          <div className="section__header text-center">
-            <h2 className="section__title">তথ্যের উৎস</h2>
-            <p className="section__subtitle">সরকারি ৭টি বিভাগ থেকে সরাসরি তথ্য সংগৃহীত</p>
-          </div>
-          <div className="source-list">
-            <span className="source-tag">এসি ল্যান্ড অফিস</span>
-            <span className="source-tag">সাব-রেজিস্ট্রি অফিস</span>
-            <span className="source-tag">ভূমি জরিপ অধিদপ্তর</span>
-            <span className="source-tag">ব্যাংক ও আর্থিক প্রতিষ্ঠান</span>
-            <span className="source-tag">জেলা জজ আদালত</span>
-            <span className="source-tag">জেলা প্রশাসকের কার্যালয়</span>
-            <span className="source-tag">জাতীয় পরিচয়পত্র শাখা</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Featured listings */}
-      <section className="section">
         <div className="container">
           <div className="section__header">
             <h2 className="section__title">সাম্প্রতিক তালিকা</h2>
