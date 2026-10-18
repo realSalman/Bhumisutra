@@ -774,3 +774,262 @@ export function getStats() {
     total_citizens: CITIZENS.length,
   };
 }
+
+// --- Full source-level verification report ---
+
+export function verifyDeedFull(deedNo: string): import("@/types").VerificationReport {
+  const deed = DEEDS.find((d) => d.deed_no === deedNo);
+  if (!deed) {
+    return {
+      found: false,
+      encumbrances: [],
+      hash_match: false,
+      sources: [],
+      final_score: 0,
+      final_status: "UNVERIFIED",
+    };
+  }
+
+  const parcel = PARCELS.find((p) => p.id === deed.parcel_id);
+  const populatedParcel = parcel ? populateMouza(parcel) : undefined;
+  const mouza = populatedParcel?.mouza;
+  const khatian = KHATIANS.find((k) => k.parcel_id === deed.parcel_id);
+  const mutation = MUTATIONS.find((m) => m.parcel_id === deed.parcel_id);
+  const ownership = OWNERSHIP_RECORDS.find(
+    (o) => o.parcel_id === deed.parcel_id && o.is_current
+  );
+  const encumbrances = ENCUMBRANCES.filter(
+    (e) => e.parcel_id === deed.parcel_id && e.is_active
+  );
+  const buyer = deed.buyer_citizen_id
+    ? CITIZENS.find((c) => c.id === deed.buyer_citizen_id)
+    : undefined;
+  const seller = deed.seller_citizen_id
+    ? CITIZENS.find((c) => c.id === deed.seller_citizen_id)
+    : undefined;
+
+  const hashMatch =
+    deed.document_hash !==
+    "0000000000000000000000000000000000000000000000000000000000000000";
+
+  // Build source-level checks
+  const sources: import("@/types").SourceCheckResult[] = [];
+
+  // 1. Sub-Registry (Deed)
+  sources.push({
+    source_name: "সাব-রেজিস্ট্রি অফিস",
+    source_icon: "📜",
+    found: true,
+    pass: hashMatch,
+    details: {
+      "দলিল নং": deed.deed_no,
+      "ধরণ": deed.deed_type,
+      "ক্রেতা": deed.buyer_name_bn ?? "—",
+      "বিক্রেতা": deed.seller_name_bn ?? "—",
+      "নিবন্ধন তারিখ": deed.registration_date,
+      "অফিস": deed.registration_office ?? "—",
+      "ঘোষিত মূল্য": deed.declared_value ? `৳${deed.declared_value.toLocaleString()}` : "—",
+      "হ্যাশ": deed.document_hash?.slice(0, 16) + "..." ?? "—",
+    },
+    ...(!hashMatch
+      ? {
+          mismatch_field: "হ্যাশ",
+          mismatch_reason: "ডকুমেন্ট হ্যাশ সন্দেহজনক — দলিল পরিবর্তিত হয়ে থাকতে পারে",
+        }
+      : {}),
+  });
+
+  // 2. AC Land — Khatian
+  const khatianOwnerMatchesBuyer =
+    khatian?.owner_citizen_id === deed.buyer_citizen_id;
+  if (khatian) {
+    sources.push({
+      source_name: "এসি ল্যান্ড অফিস (খতিয়ান)",
+      source_icon: "🏛",
+      found: true,
+      pass: khatianOwnerMatchesBuyer,
+      details: {
+        "খতিয়ান নং": khatian.khatian_no,
+        "জরিপ": khatian.survey_type,
+        "মালিকের নাম": khatian.owner_names_bn ?? "—",
+        "পিতার নাম": khatian.father_names ?? "—",
+        "অংশ": khatian.owner_share ?? "—",
+        "রেকর্ডকৃত আয়তন": khatian.recorded_area ? `${khatian.recorded_area} শতাংশ` : "—",
+      },
+      ...(!khatianOwnerMatchesBuyer
+        ? {
+            mismatch_field: "মালিকের নাম",
+            mismatch_reason: `খতিয়ানে "${khatian.owner_names_bn}" কিন্তু দলিলে ক্রেতা "${deed.buyer_name_bn}"`,
+          }
+        : {}),
+    });
+  } else {
+    sources.push({
+      source_name: "এসি ল্যান্ড অফিস (খতিয়ান)",
+      source_icon: "🏛",
+      found: false,
+      pass: false,
+      details: {},
+      mismatch_reason: "এই দাগের জন্য কোনো খতিয়ান রেকর্ড পাওয়া যায়নি",
+    });
+  }
+
+  // 3. AC Land — Mutation
+  if (mutation) {
+    const newOwner = mutation.new_owner_id
+      ? CITIZENS.find((c) => c.id === mutation.new_owner_id)
+      : undefined;
+    const prevOwner = mutation.previous_owner_id
+      ? CITIZENS.find((c) => c.id === mutation.previous_owner_id)
+      : undefined;
+    const mutationPass = mutation.status === "APPROVED";
+
+    sources.push({
+      source_name: "এসি ল্যান্ড অফিস (নামজারি)",
+      source_icon: "🏛",
+      found: true,
+      pass: mutationPass,
+      details: {
+        "কেস নং": mutation.mutation_case_no,
+        "স্ট্যাটাস": mutation.status,
+        "পূর্ববর্তী মালিক": prevOwner?.name_bn ?? "—",
+        "নতুন মালিক": newOwner?.name_bn ?? "—",
+        "আবেদন তারিখ": mutation.applied_date ?? "—",
+        "অনুমোদন তারিখ": mutation.approved_date ?? "—",
+        "অফিসার": mutation.officer_name ?? "—",
+      },
+      ...(!mutationPass
+        ? {
+            mismatch_field: "স্ট্যাটাস",
+            mismatch_reason: `নামজারি ${mutation.status} — অনুমোদিত নয়`,
+          }
+        : {}),
+    });
+  } else {
+    sources.push({
+      source_name: "এসি ল্যান্ড অফিস (নামজারি)",
+      source_icon: "🏛",
+      found: false,
+      pass: false,
+      details: {},
+      mismatch_reason: "কোনো নামজারি রেকর্ড পাওয়া যায়নি — মালিকানা হস্তান্তর অসম্পূর্ণ",
+    });
+  }
+
+  // 4. DLRS — Parcel / Mouza
+  if (populatedParcel && mouza) {
+    sources.push({
+      source_name: "জরিপ অধিদপ্তর (DLRS)",
+      source_icon: "🗺",
+      found: true,
+      pass: true,
+      details: {
+        "মৌজা": `${mouza.mouza_name_bn} (JL-${mouza.mouza_no})`,
+        "দাগ নং": populatedParcel.dag_no,
+        "আয়তন": `${populatedParcel.area_decimals} শতাংশ`,
+        "জমির ধরণ": populatedParcel.land_type,
+        "শ্রেণী": populatedParcel.land_class,
+        "উপজেলা": mouza.upazila,
+        "জেলা": mouza.district,
+      },
+    });
+  }
+
+  // 5. Banks — Mortgage check
+  const bankEncumbrances = encumbrances.filter(
+    (e) => e.encumbrance_type === "MORTGAGE" || e.encumbrance_type === "LIEN"
+  );
+  sources.push({
+    source_name: "ব্যাংক ও আর্থিক প্রতিষ্ঠান",
+    source_icon: "🏦",
+    found: true,
+    pass: bankEncumbrances.length === 0,
+    details:
+      bankEncumbrances.length === 0
+        ? { "স্ট্যাটাস": "কোনো বন্ধক বা দায় নেই" }
+        : Object.fromEntries(
+            bankEncumbrances.map((e, i) => [
+              `দায় ${i + 1}`,
+              `${e.description} — ${e.institution_name}`,
+            ])
+          ),
+    ...(bankEncumbrances.length > 0
+      ? {
+          mismatch_field: "দায় ১",
+          mismatch_reason: "সক্রিয় বন্ধক/দায় পাওয়া গেছে — জমি দায়মুক্ত নয়",
+        }
+      : {}),
+  });
+
+  // 6. Courts — Dispute check
+  const courtEncumbrances = encumbrances.filter(
+    (e) =>
+      e.encumbrance_type === "COURT_CASE" ||
+      e.encumbrance_type === "INJUNCTION"
+  );
+  sources.push({
+    source_name: "জেলা আদালত",
+    source_icon: "⚖",
+    found: true,
+    pass: courtEncumbrances.length === 0,
+    details:
+      courtEncumbrances.length === 0
+        ? { "স্ট্যাটাস": "কোনো সক্রিয় মামলা বা নিষেধাজ্ঞা নেই" }
+        : Object.fromEntries(
+            courtEncumbrances.map((e, i) => [
+              `মামলা ${i + 1}`,
+              `${e.case_no} — ${e.description}`,
+            ])
+          ),
+    ...(courtEncumbrances.length > 0
+      ? {
+          mismatch_field: "মামলা ১",
+          mismatch_reason: "সক্রিয় আদালত মামলা পাওয়া গেছে",
+        }
+      : {}),
+  });
+
+  // 7. DC Office — Acquisition check
+  const dcEncumbrances = encumbrances.filter(
+    (e) =>
+      e.encumbrance_type === "ACQUISITION_NOTICE" ||
+      e.encumbrance_type === "TAX_DUE"
+  );
+  sources.push({
+    source_name: "ডিসি অফিস",
+    source_icon: "🏢",
+    found: true,
+    pass: dcEncumbrances.length === 0,
+    details:
+      dcEncumbrances.length === 0
+        ? { "স্ট্যাটাস": "কোনো অধিগ্রহণ নোটিশ নেই" }
+        : Object.fromEntries(
+            dcEncumbrances.map((e, i) => [
+              `নোটিশ ${i + 1}`,
+              `${e.description}`,
+            ])
+          ),
+    ...(dcEncumbrances.length > 0
+      ? {
+          mismatch_field: "নোটিশ ১",
+          mismatch_reason: "অধিগ্রহণ নোটিশ বা কর বকেয়া পাওয়া গেছে",
+        }
+      : {}),
+  });
+
+  return {
+    found: true,
+    deed,
+    parcel: populatedParcel,
+    khatian,
+    mutation,
+    ownership,
+    encumbrances,
+    buyer,
+    seller,
+    hash_match: hashMatch,
+    sources,
+    final_score: ownership?.verification_score ?? 0,
+    final_status: ownership?.verification_status ?? "UNVERIFIED",
+  };
+}
